@@ -3,44 +3,24 @@ stages:
   - deploy
 
 variables:
-  # ID registry в Yandex Cloud
   YC_REGISTRY_ID: "crpemh7fg1uk4n6bfgje"
-  # Имя образа
   IMAGE_NAME: "hello-world"
-  # Путь к Dockerfile относительно корня
-  DOCKERFILE_PATH: "src/Dockerfile"
-  # Путь к Ansible относительно корня
-  ANSIBLE_PATH: "src/ansible"
 
-# Этап сборки Docker образа
 build:
   stage: build
   image: docker:latest
   services:
     - docker:dind
   rules:
-    # Запускается только при пуше тега
     - if: $CI_COMMIT_TAG
   script:
-    # Логинимся в Yandex Container Registry
     - echo "$YC_OAUTH_TOKEN" | docker login --username oauth --password-stdin cr.yandex
-
-    # Переходим в папку с Dockerfile
     - cd src
-
-    # Собираем образ
     - docker build --platform linux/amd64 --build-arg app_version=$CI_COMMIT_TAG -t cr.yandex/$YC_REGISTRY_ID/$IMAGE_NAME:$CI_COMMIT_TAG .
-
-    # Пушим образ
     - docker push cr.yandex/$YC_REGISTRY_ID/$IMAGE_NAME:$CI_COMMIT_TAG
-
-    # Также пушим как latest
     - docker tag cr.yandex/$YC_REGISTRY_ID/$IMAGE_NAME:$CI_COMMIT_TAG cr.yandex/$YC_REGISTRY_ID/$IMAGE_NAME:latest
     - docker push cr.yandex/$YC_REGISTRY_ID/$IMAGE_NAME:latest
-  tags:
-    - docker
 
-# Этап деплоя с ручным запуском
 deploy:
   stage: deploy
   image: alpine:latest
@@ -54,7 +34,5 @@ deploy:
     - echo "$SSH_PRIVATE_KEY" > ~/.ssh/id_rsa
     - chmod 600 ~/.ssh/id_rsa
   script:
-    - cd $ANSIBLE_PATH
+    - cd src/ansible
     - ansible-playbook playbook.yml --extra-vars "app_version=$CI_COMMIT_TAG yc_oauth_token=$YC_OAUTH_TOKEN"
-  tags:
-    - shell
