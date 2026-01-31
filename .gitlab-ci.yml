@@ -19,8 +19,8 @@ build:
   rules:
     - if: $CI_COMMIT_TAG
   script:
-    # ИСПРАВЛЕННАЯ СТРОКА ↓
-    - docker login -u oauth -p "$YC_OAUTH_TOKEN" cr.yandex
+    - mkdir -p ~/.docker
+    - echo '{"auths":{"cr.yandex":{"auth":"'$(echo -n "iam:$YC_IAM_TOKEN" | base64)'"}}}' > ~/.docker/config.json
     - cd src
     - docker build --platform linux/amd64 --build-arg app_version=$CI_COMMIT_TAG -t cr.yandex/$YC_REGISTRY_ID/$IMAGE_NAME:$CI_COMMIT_TAG .
     - docker push cr.yandex/$YC_REGISTRY_ID/$IMAGE_NAME:$CI_COMMIT_TAG
