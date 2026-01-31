@@ -22,13 +22,9 @@ build:
   rules:
     - if: $CI_COMMIT_TAG
   script:
-    - echo "OAuth token exists: ${YC_OAUTH_TOKEN+yes}"
-    - echo "IAM token exists: ${YC_IAM_TOKEN+yes}"
-
     - mkdir -p ~/.docker
     - echo "oauth:$YC_OAUTH_TOKEN" | base64 | tr -d '\n' > /tmp/token.txt
     - echo '{"auths":{"cr.yandex":{"auth":"'$(cat /tmp/token.txt)'"}}}' > ~/.docker/config.json
-    
     - cd src
     - docker build --build-arg app_version=$CI_COMMIT_TAG -t cr.yandex/$YC_REGISTRY_ID/$IMAGE_NAME:$CI_COMMIT_TAG .
     - docker push cr.yandex/$YC_REGISTRY_ID/$IMAGE_NAME:$CI_COMMIT_TAG
