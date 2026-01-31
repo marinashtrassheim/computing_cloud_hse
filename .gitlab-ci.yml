@@ -14,16 +14,14 @@ build:
   rules:
     - if: $CI_COMMIT_TAG
   script:
-    # Используем сервисный аккаунт
     - mkdir -p ~/.docker
     - echo '$YC_SERVICE_ACCOUNT_KEY' > /tmp/sa-key.json
     - echo '{"credHelpers": {"cr.yandex": "yc"}}' > ~/.docker/config.json
     - mkdir -p ~/.config/yandex-cloud
-    - echo 'current:
-        service-account-key-file: /tmp/sa-key.json
-        cloud-id: b1gjdm52o11vr2uc8v4f
-        folder-id: b1g79op71q1gsi6djitg' > ~/.config/yandex-cloud/config.yaml
-
+    - echo 'current:' > ~/.config/yandex-cloud/config.yaml
+    - echo '  service-account-key-file: /tmp/sa-key.json' >> ~/.config/yandex-cloud/config.yaml
+    - echo '  cloud-id: b1gjdm52o11vr2uc8v4f' >> ~/.config/yandex-cloud/config.yaml
+    - echo '  folder-id: b1g79op71q1gsi6djitg' >> ~/.config/yandex-cloud/config.yaml
     - cd src
     - docker build --build-arg app_version=$CI_COMMIT_TAG -t cr.yandex/$YC_REGISTRY_ID/$IMAGE_NAME:$CI_COMMIT_TAG .
     - docker push cr.yandex/$YC_REGISTRY_ID/$IMAGE_NAME:$CI_COMMIT_TAG
