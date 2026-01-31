@@ -1,0 +1,21 @@
+upstream blue {
+    server 127.0.0.1:8081;
+}
+upstream green {
+    server 127.0.0.1:8082;
+}
+
+server {
+    listen 80;
+    server_name blue-green-app;
+
+    location / {
+        {% if active_group == "blue" %}
+        proxy_pass http://blue;
+        {% else %}
+        proxy_pass http://green;
+        {% endif %}
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
+}

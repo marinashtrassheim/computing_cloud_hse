@@ -1,0 +1,84 @@
+---
+- name: Configure Blue-Green deployment
+  hosts: deploy-vm
+  become: yes
+  vars:
+    registry_image: "cr.yandex/crpemh7fg1uk4n6bfgje/hello-world:{{ app_version }}"
+    current_active: "blue"
+
+  tasks:
+    - name: Install dependencies
+      apt:
+        name:
+          - docker.io
+          - nginx
+          - python3-pip
+        state: present
+        update_cache: yes
+
+    - name: Add yc-user to docker group
+      user:
+        name: yc-user
+        groups: docker
+        append: yes
+
+    - name: Ensure Nginx config directory exists
+      file:
+        path: /etc/nginx/sites-available/
+        state: directory
+
+    - name: Deploy Nginx configuration
+      template:
+        src: templates/nginx.conf.j2
+        dest: /etc/nginx/sites-available/blue-green
+      vars:
+        active_group: "{{ current_active }}"
+
+    - name: Enable Nginx site
+      file:
+        src: /etc/nginx/sites-available/blue-green
+        dest: /etc/nginx/sites-enabled/blue-green
+        state: link
+
+    - name: Authenticate in Container Registry with OAuth token
+      shell: |
+        echo "{{ yc_oauth_token }}" | docker login --username oauth --password-stdin cr.yandex
+      args:
+        executable: /bin/bash
+
+    - name: Ensure old containers are stopped and removed
+      shell: |
+        docker stop blue-app green-app 2>/dev/null || true
+        docker rm blue-app green-app 2>/dev/null || true
+
+    - name: Pull the new Docker image
+      docker_image:
+        name: "{{ registry_image }}"
+        source: pull
+        force_source: yes
+
+    - name: Start the INACTIVE container group first
+      docker_container:
+        name: "{{ 'green-app' if current_active == 'blue' else 'blue-app' }}"
+        image: "{{ registry_image }}"
+        state: started
+        ports:
+          - "{{ '8082:8000' if current_active == 'blue' else '8081:8000' }}"
+
+    - name: Reload Nginx to switch traffic
+      service:
+        name: nginx
+        state: reloaded
+
+    - name: Start the NEW ACTIVE container group
+      docker_container:
+        name: "{{ 'blue-app' if current_active == 'blue' else 'green-app' }}"
+        image: "{{ registry_image }}"
+        state: started
+        ports:
+          - "{{ '8081:8000' if current_active == 'blue' else '8082:8000' }}"
+
+    - name: Stop and remove the OLD INACTIVE container
+      shell: |
+        docker stop {{ 'blue-app' if current_active == 'green' else 'green-app' }}
+        docker rm {{ 'blue-app' if current_active == 'green' else 'green-app' }}
